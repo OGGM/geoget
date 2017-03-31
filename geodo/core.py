@@ -83,7 +83,7 @@ MEMORY = Memory(cachedir=cfg.CACHE_DIR, verbose=0)
 tuple2int = partial(np.array, dtype=np.int64)
 
 
-def _get_download_lock(lock_dir):
+def get_download_lock(lock_dir):
     mkdir(lock_dir)
     lockfile = os.path.join(lock_dir, 'download.lock')
     try:
@@ -157,7 +157,7 @@ class SuperclassMeta(type):
 
 
 def _download_sample_files(repo, outdir):
-    with _get_download_lock(lock_dir=outdir):
+    with get_download_lock(lock_dir=outdir):
         return download_gh_sample_files_unlocked(repo=repo, outdir=outdir)
 
 
@@ -266,7 +266,7 @@ def download_gh_sample_files_unlocked(repo=None, outdir=None):
 
 
 def _download_srtm_file(zone):
-    with _get_download_lock():
+    with get_download_lock():
         return _download_srtm_file_unlocked(zone)
 
 
@@ -316,7 +316,7 @@ def _download_srtm_file_unlocked(zone):
 
 
 def _download_dem3_viewpano(zone):
-    with _get_download_lock():
+    with get_download_lock():
         return _download_dem3_viewpano_unlocked(zone)
 
 
@@ -422,7 +422,7 @@ def _download_dem3_viewpano_unlocked(zone):
 
 
 def _download_aster_file(zone, unit):
-    with _get_download_lock():
+    with get_download_lock():
         return _download_aster_file_unlocked(zone, unit)
 
 
@@ -461,7 +461,7 @@ def _download_aster_file_unlocked(zone, unit):
 
 
 def _download_alternate_topo_file(fname):
-    with _get_download_lock():
+    with get_download_lock():
         return _download_alternate_topo_file_unlocked(fname)
 
 
@@ -523,7 +523,7 @@ def _get_centerline_lonlat(gdir):
 
 
 def aws_file_download(aws_path, local_path, reset=False):
-    with _get_download_lock():
+    with get_download_lock():
         return _aws_file_download_unlocked(aws_path, local_path, reset)
 
 
@@ -1097,7 +1097,7 @@ def get_glathida_file():
 
 
 def get_rgi_dir():
-    with _get_download_lock():
+    with get_download_lock():
         return _get_rgi_dir_unlocked()
 
 
@@ -1143,7 +1143,7 @@ def _get_rgi_dir_unlocked():
 
 
 def get_cru_file(var=None):
-    with _get_download_lock():
+    with get_download_lock():
         return _get_cru_file_unlocked(var)
 
 
