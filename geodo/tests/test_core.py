@@ -10,9 +10,10 @@ import numpy as np
 import pandas as pd
 from numpy.testing import assert_array_equal
 
-from oggm.tests import is_download
+from geodo.tests import is_download
 from oggm import utils
 from oggm import cfg
+from geodo import core
 
 # Globals
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -123,7 +124,8 @@ class TestDataFiles(unittest.TestCase):
 
     def test_download_demo_files(self):
 
-        f = utils.get_demo_file('Hintereisferner.shp')
+        f = core.get_demo_file('OGGM/oggm-sample-data', 'Hintereisferner.shp',
+                               TEST_DIR)
         self.assertTrue(os.path.exists(f))
 
         sh = salem.read_shapefile(f)
