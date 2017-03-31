@@ -125,12 +125,19 @@ def progress_urlretrieve(url, ofile):
         return _urlretrieve(url, ofile)
 
 
-def empty_cache():  # pragma: no cover
-    """Empty oggm's cache directory."""
+def empty_cache(cdir):
+    """
+    Empty the cache directory.
+    
+    Parameters
+    ----------
+    cdir: str
+        Path to the cache directory to empty
+    """
 
-    if os.path.exists(cfg.CACHE_DIR):
-        shutil.rmtree(cfg.CACHE_DIR)
-    os.makedirs(cfg.CACHE_DIR)
+    if os.path.exists(cdir):
+        shutil.rmtree(cdir)
+    os.makedirs(cdir)
 
 
 def expand_path(p):
