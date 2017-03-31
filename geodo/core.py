@@ -163,12 +163,27 @@ class SuperclassMeta(type):
         return cls
 
 
-def _download_sample_files(repo, outdir):
+def download_gh_sample_files(repo, outdir):
+    """
+    Download sample files from a GitHub repository.
+    
+    Parameters
+    ----------
+    repo: str
+        Name of the GitHub repository as string
+    outdir: str, optional
+        Path to the directory where to store the files
+        
+    Returns
+    -------
+    A dictionary indicating all downloaded files (keys) and their local paths
+    (values).
+    """
     with get_download_lock(lock_dir=outdir):
-        return download_gh_sample_files_unlocked(repo=repo, outdir=outdir)
+        return _download_gh_sample_files_unlocked(repo=repo, outdir=outdir)
 
 
-def download_gh_sample_files_unlocked(repo=None, outdir=None):
+def _download_gh_sample_files_unlocked(repo=None, outdir=None):
     """
     Checks for presence and downloads a GitHub data repo if needed.
     
@@ -1000,7 +1015,7 @@ def aster_zone(lon_ex, lat_ex):
 def get_demo_file(repo, fname, outdir):
     """Returns the path to the desired OGGM file."""
 
-    d = _download_sample_files(repo, outdir)
+    d = download_gh_sample_files(repo, outdir)
     if fname in d:
         return d[fname]
     else:
@@ -1010,7 +1025,7 @@ def get_demo_file(repo, fname, outdir):
 def get_cru_cl_file():
     """Returns the path to the unpacked CRU CL file (is in sample data)."""
 
-    _download_sample_files('OGGM/oggm-sample-data', cfg.CACHE_DIR)
+    download_gh_sample_files('OGGM/oggm-sample-data', cfg.CACHE_DIR)
 
     sdir = os.path.join(cfg.CACHE_DIR, 'oggm-sample-data-master', 'cru')
     fpath = os.path.join(sdir, 'cru_cl2.nc')
@@ -1042,7 +1057,7 @@ def get_wgms_files():
         return outf, datadir
 
     # Roll our own
-    _download_sample_files('OGGM/oggm-sample-data', cfg.CACHE_DIR)
+    download_gh_sample_files('OGGM/oggm-sample-data', cfg.CACHE_DIR)
     sdir = os.path.join(cfg.CACHE_DIR, 'oggm-sample-data-master', 'wgms')
     outf = os.path.join(sdir, 'rgi_wgms_links_2015_RGIV5.csv')
     assert os.path.exists(outf)
@@ -1071,7 +1086,7 @@ def get_leclercq_files():
         return outf, datadir
 
     # Roll our own
-    _download_sample_files('OGGM/oggm-sample-data', cfg.CACHE_DIR)
+    download_gh_sample_files('OGGM/oggm-sample-data', cfg.CACHE_DIR)
     sdir = os.path.join(cfg.CACHE_DIR, 'oggm-sample-data-master', 'leclercq')
     outf = os.path.join(sdir, 'rgi_leclercq_links_2012_RGIV5.csv')
     assert os.path.exists(outf)
@@ -1096,7 +1111,7 @@ def get_glathida_file():
         return cfg.PATHS['glathida_rgi_links']
 
     # Roll our own
-    _download_sample_files()
+    download_gh_sample_files()
     sdir = os.path.join(cfg.CACHE_DIR, 'oggm-sample-data-master', 'glathida')
     outf = os.path.join(sdir, 'rgi_glathida_links_2014_RGIV5.csv')
     assert os.path.exists(outf)
