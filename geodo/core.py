@@ -56,25 +56,6 @@ SAMPLE_DATA_GH_REPO = 'OGGM/oggm-sample-data'
 CRU_SERVER = 'https://crudata.uea.ac.uk/cru/data/hrg/cru_ts_3.24/cruts' \
              '.1609301803.v3.24/'
 
-DEM3REG = {
-    'ISL': [-25., -12., 63., 67.],  # Iceland
-    'SVALBARD': [10., 34., 76., 81.],
-    'JANMAYEN': [-10., -7., 70., 72.],
-    'FJ': [36., 66., 79., 82.],  # Franz Josef Land
-    'FAR': [-8., -6., 61., 63.],  # Faroer
-    'BEAR': [18., 20., 74., 75.],  # Bear Island
-    'SHL': [-3., 0., 60., 61.],  # Shetland
-    # Antarctica tiles as UTM zones, large files
-    # '01-15': [-180., -91., -90, -60.],
-    # '16-30': [-91., -1., -90., -60.],
-    # '31-45': [-1., 89., -90., -60.],
-    # '46-60': [89., 189., -90., -60.],
-    # Greenland tiles
-    # 'GL-North': [-78., -11., 75., 84.],
-    # 'GL-West': [-68., -42., 64., 76.],
-    # 'GL-South': [-52., -40., 59., 64.],
-    # 'GL-East': [-42., -17., 64., 76.]
-}
 
 # Joblib
 MEMORY = Memory(cachedir=cfg.CACHE_DIR, verbose=0)
@@ -349,19 +330,51 @@ def _download_srtm_file_unlocked(zone, outdir, retry=5):
     return out
 
 
-def _download_dem3_viewpano(zone):
-    with get_download_lock():
-        return _download_dem3_viewpano_unlocked(zone)
+def download_dem3_viewpano(zone, outdir):
+    """
+    Download a viewfinderpanoramas.org file of a specified zone.
+    
+    Parameters
+    ----------
+    zone: str
+        A valid zone from viewfinderpanoramas.org
+    outdir: str
+        The directory where to store the download
+
+    Returns
+    -------
+    The path to the downloaded viewfinderpanoramas.org file
+    """
+    with get_download_lock(outdir):
+        return _download_dem3_viewpano_unlocked(zone, outdir)
 
 
-def _download_dem3_viewpano_unlocked(zone):
+def _download_dem3_viewpano_unlocked(zone, outdir):
     """Checks if the srtm data is in the directory and if not, download it.
     """
-    odir = os.path.join(cfg.PATHS['topo_dir'], 'dem3', zone)
+    DEM3REG = {
+        'ISL': [-25., -12., 63., 67.],  # Iceland
+        'SVALBARD': [10., 34., 76., 81.],
+        'JANMAYEN': [-10., -7., 70., 72.],
+        'FJ': [36., 66., 79., 82.],  # Franz Josef Land
+        'FAR': [-8., -6., 61., 63.],  # Faroer
+        'BEAR': [18., 20., 74., 75.],  # Bear Island
+        'SHL': [-3., 0., 60., 61.],  # Shetland
+        # Antarctica tiles as UTM zones, large files
+        # '01-15': [-180., -91., -90, -60.],
+        # '16-30': [-91., -1., -90., -60.],
+        # '31-45': [-1., 89., -90., -60.],
+        # '46-60': [89., 189., -90., -60.],
+        # Greenland tiles
+        # 'GL-North': [-78., -11., 75., 84.],
+        # 'GL-West': [-68., -42., 64., 76.],
+        # 'GL-South': [-52., -40., 59., 64.],
+        # 'GL-East': [-42., -17., 64., 76.]
+    }
 
-    mkdir(odir)
-    ofile = os.path.join(odir, 'dem3_' + zone + '.zip')
-    outpath = os.path.join(odir, zone+'.tif')
+    mkdir(outdir)
+    ofile = os.path.join(outdir, 'dem3_' + zone + '.zip')
+    outpath = os.path.join(outdir, zone+'.tif')
 
     # check if TIFF file exists already
     if os.path.exists(outpath):
@@ -386,15 +399,14 @@ def _download_dem3_viewpano_unlocked(zone):
                 retry_counter += 1
                 progress_urlretrieve(ifile, ofile)
                 with zipfile.ZipFile(ofile) as zf:
-                    zf.extractall(odir)
+                    zf.extractall(outdir)
                 break
             except HTTPError as err:
                 # This works well for py3
                 if err.code == 404:
                     # Ok so this *should* be an ocean tile
                     return None
-                elif err.code >= 500 and err.code < 600 and  \
-                                retry_counter <= retry_max:
+                elif (500 <= err.code < 600) and retry_counter <= retry_max:
                     print("Downloading DEM3 data failed with HTTP error %s, "
                           "retrying in 10 seconds... %s/%s" %
                           (err.code, retry_counter, retry_max))
@@ -420,15 +432,15 @@ def _download_dem3_viewpano_unlocked(zone):
     # BUT: There are southern hemisphere files that download properly. However,
     # the unzipped folder has the file name of
     # the northern hemisphere file. Some checks if correct file exists:
-    if len(zone)==4 and zone.startswith('S'):
-        zonedir = os.path.join(odir, zone[1:])
+    if len(zone) == 4 and zone.startswith('S'):
+        zonedir = os.path.join(outdir, zone[1:])
     else:
-        zonedir = os.path.join(odir, zone)
+        zonedir = os.path.join(outdir, zone)
     globlist = glob.glob(os.path.join(zonedir, '*.hgt'))
 
     # take care of the special file naming cases
     if zone in DEM3REG.keys():
-        globlist = glob.glob(os.path.join(odir, '*', '*.hgt'))
+        globlist = glob.glob(os.path.join(outdir, '*', '*.hgt'))
 
     if not globlist:
         raise RuntimeError("We should have some files here, but we don't")
@@ -1304,7 +1316,7 @@ def get_topo_file(lon_ex, lat_ex, rgi_region=None, source=None):
             zones = dem3_viewpano_zone(lon_ex, lat_ex)
             sources = []
             for z in zones:
-                sources.append(_download_dem3_viewpano(z))
+                sources.append(download_dem3_viewpano(z))
             source_str = source
         if source == 'ASTER':
             # use ASTER
