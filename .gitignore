@@ -1,13 +1,13 @@
 *.py[cod]
 __pycache__
 
-# PyCharm stuffs
+# PyCharm stuff
 .idea/
 
-# coverage stuffs
+# coverage stuff
 .coverage
 
-# Notebook stuffs
+# Notebook stuff
 examples/*checkpoints
 .ipynb_checkpoints
 
@@ -17,6 +17,7 @@ examples/*checkpoints
 eggs
 
 # specific
+geodo/tests/tmp_*
 *.lock
 *.html
 docs/*-gen.rst
