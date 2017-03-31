@@ -287,39 +287,51 @@ def _download_gh_sample_files_unlocked(repo=None, outdir=None):
     return out
 
 
-def _download_srtm_file(zone):
-    with get_download_lock():
-        return _download_srtm_file_unlocked(zone)
+def download_srtm_file(zone, outdir):
+    """
+    Download an SRTM file of a specified zone.
+    
+    Parameters
+    ----------
+    zone: str
+        A valid SRTM zone
+    outdir: str
+        Directory where to store the SRTM file 
+
+    Returns
+    -------
+    Path to the downloaded SRTM file.
+    """
+    with get_download_lock(outdir):
+        return _download_srtm_file_unlocked(zone, outdir)
 
 
-def _download_srtm_file_unlocked(zone):
-    """Checks if the srtm data is in the directory and if not, download it.
+def _download_srtm_file_unlocked(zone, outdir, retry=5):
+    """Check if the srtm data is already in the directory. If not, download it.
     """
 
-    odir = os.path.join(cfg.PATHS['topo_dir'], 'srtm')
-    mkdir(odir)
-    ofile = os.path.join(odir, 'srtm_' + zone + '.zip')
+    mkdir(outdir)
+    ofile = os.path.join(outdir, 'srtm_' + zone + '.zip')
 #    ifile = 'http://srtm.csi.cgiar.org/SRT-ZIP/SRTM_V41/SRTM_Data_GeoTiff' \
     ifile = 'http://droppr.org/srtm/v4.1/6_5x5_TIFs' \
             '/srtm_' + zone + '.zip'
     if not os.path.exists(ofile):
         retry_counter = 0
-        retry_max = 5
+        retry_max = retry
         while True:
             # Try to download
             try:
                 retry_counter += 1
                 progress_urlretrieve(ifile, ofile)
                 with zipfile.ZipFile(ofile) as zf:
-                    zf.extractall(odir)
+                    zf.extractall(outdir)
                 break
             except HTTPError as err:
                 # This works well for py3
                 if err.code == 404:
                     # Ok so this *should* be an ocean tile
                     return None
-                elif err.code >= 500 and err.code < 600 and \
-                         retry_counter <= retry_max:
+                elif (500 <= err.code < 600) and retry_counter <= retry_max:
                     print("Downloading SRTM data failed with HTTP error %s, "
                           "retrying in 10 seconds... %s/%s" %
                           (err.code, retry_counter, retry_max))
@@ -332,7 +344,7 @@ def _download_srtm_file_unlocked(zone):
                 # Ok so this *should* be an ocean tile
                 return None
 
-    out = os.path.join(odir, 'srtm_' + zone + '.tif')
+    out = os.path.join(outdir, 'srtm_' + zone + '.tif')
     assert os.path.exists(out)
     return out
 
@@ -1309,7 +1321,7 @@ def get_topo_file(lon_ex, lat_ex, rgi_region=None, source=None):
             zones = srtm_zone(lon_ex, lat_ex)
             sources = []
             for z in zones:
-                sources.append(_download_srtm_file(z))
+                sources.append(download_srtm_file(z))
             source_str = source
 
     # For the very last cases a very coarse dataset ?
