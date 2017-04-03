@@ -705,8 +705,21 @@ def dem3_viewpano_zone(lon_ran, lat_ran, extra_reg=DEM3REG):
     return list(sorted(set(zones)))
 
 
-def aster_zone(lon_ex, lat_ex):
-    """Returns a list of ASTER V2 zones and units covering the desired extent.
+def aster_zone(lon_ran, lat_ran):
+    """
+    Returns a list of ASTER V2 zones and units covering the desired extent.
+    
+    Parameters
+    ----------
+    lon_ran: array-like
+        Longitude range
+    lat_ran: array-like
+        Latitude range
+
+    Returns
+    -------
+    (zones, units): A list of zones and a list of units covering the latitude 
+    and longitude range
     """
 
     # ASTER is a bit more work. The units are directories of 5 by 5,
@@ -714,15 +727,15 @@ def aster_zone(lon_ex, lat_ex):
     units_dx = 5.
 
     # quick n dirty solution to be sure that we will cover the whole range
-    mi, ma = np.min(lon_ex), np.max(lon_ex)
-    lon_ex = np.linspace(mi, ma, np.ceil((ma - mi) + 3))
-    mi, ma = np.min(lat_ex), np.max(lat_ex)
-    lat_ex = np.linspace(mi, ma, np.ceil((ma - mi) + 3))
+    mi, ma = np.min(lon_ran), np.max(lon_ran)
+    lon_ran = np.linspace(mi, ma, np.ceil((ma - mi) + 3))
+    mi, ma = np.min(lat_ran), np.max(lat_ran)
+    lat_ran = np.linspace(mi, ma, np.ceil((ma - mi) + 3))
 
     zones = []
     units = []
-    for lon in lon_ex:
-        for lat in lat_ex:
+    for lon in lon_ran:
+        for lat in lat_ran:
             dx = np.floor(lon)
             zx = np.floor(lon / units_dx) * units_dx
             if math.copysign(1, dx) == -1:
