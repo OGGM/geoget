@@ -52,8 +52,7 @@ from oggm.cfg import CUMSEC_IN_MONTHS, SEC_IN_YEAR, BEGINSEC_IN_MONTHS
 from oggm.utils import mkdir
 
 SAMPLE_DATA_GH_REPO = 'OGGM/oggm-sample-data'
-CRU_SERVER = 'https://crudata.uea.ac.uk/cru/data/hrg/cru_ts_3.24/cruts' \
-             '.1609301803.v3.24/'
+
 
 
 # Joblib
@@ -949,31 +948,49 @@ def _get_rgi_data_unlocked(rgi_dir, version):
     return rgi_dir
 
 
-def get_cru_file(var=None):
-    with get_download_lock():
-        return _get_cru_file_unlocked(var)
-
-
-def _get_cru_file_unlocked(var=None):
+def get_cru_file(outdir, var=None):
     """
-    Returns a path to the desired CRU TS file.
+    Returns a path to a Climate Research Unit Time Series (CRU TS) file.
 
     If the file is not present, download it.
 
     Parameters
     ----------
-    var: 'tmp' or 'pre'
+    outdir: str
+        Directory where to download the data if not already present.
+    var: str
+        The parameter of the time series. Currently available: 'tmp' or 'pre'
+        for temperature and precipitation, respectively.
 
     Returns
     -------
-    path to the CRU file
+    Path to the CRU TS file
+    """
+    with get_download_lock(outdir):
+        return _get_cru_file_unlocked(var)
+
+
+def _get_cru_file_unlocked(cru_dir, var=None):
+    """
+    Returns a path to the Climate Research Unit Time Series (CRU TS) file.
+
+    If the files is not present, download it.
+    
+    Parameters
+    ----------
+    cru_dir: str
+        Directory where to download the file to/check if it already exists.
+    var: str
+        The parameter of the time series. Currently available: 'tmp' or 'pre'
+        for temperature and precipitation, respectively.
+
+    Returns
+    -------
+    Path to the CRU TS file.
     """
 
-    cru_dir = cfg.PATHS['cru_dir']
-
-    # Be sure the user gave a sensible path to the climate dir
-    if cru_dir == '~' or not os.path.exists(cru_dir):
-        raise ValueError('The CRU data directory({}) does not exist!'.format(cru_dir))
+    if not os.path.exists(cru_dir):
+        mkdir(cru_dir)
 
     # Be sure input makes sense
     if var not in ['tmp', 'pre']:
@@ -985,7 +1002,9 @@ def _get_cru_file_unlocked(var=None):
 
     # if not there download it
     if not os.path.exists(ofile):  # pragma: no cover
-        tf = CRU_SERVER + '{}/cru_ts3.23.1901.2014.{}.dat.nc.gz'.format(var,
+        cru_server = 'https://crudata.uea.ac.uk/cru/data/hrg/cru_ts_3.24/' \
+                     'cruts.1609301803.v3.24/'
+        tf = cru_server + '{}/cru_ts3.23.1901.2014.{}.dat.nc.gz'.format(var,
                                                                         var)
         progress_urlretrieve(tf, ofile + '.gz')
         with gzip.GzipFile(ofile + '.gz') as zf:
