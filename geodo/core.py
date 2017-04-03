@@ -575,8 +575,20 @@ def _aws_file_download_unlocked(aws_path, local_path, reset=False):
         raise RuntimeError('Something went wrong with the download')
 
 
-def srtm_zone(lon_ex, lat_ex):
-    """Returns a list of SRTM zones covering the desired extent.
+def srtm_zone(lon_ran, lat_ran):
+    """
+    Find the related SRTM zone(s) given latitude/longitude ranges.
+    
+    Parameters
+    ----------
+    lon_ran: array-like
+        Longitude range
+    lat_ran: array-like
+        Latitude range
+
+    Returns
+    -------
+    A list of SRTM zones coinciding with the given latitude/longitude range.
     """
 
     # SRTM are sorted in tiles of 5 degrees
@@ -586,14 +598,14 @@ def srtm_zone(lon_ex, lat_ex):
     srtm_dy = -5.
 
     # quick n dirty solution to be sure that we will cover the whole range
-    mi, ma = np.min(lon_ex), np.max(lon_ex)
-    lon_ex = np.linspace(mi, ma, np.ceil((ma - mi) + 3))
-    mi, ma = np.min(lat_ex), np.max(lat_ex)
-    lat_ex = np.linspace(mi, ma, np.ceil((ma - mi) + 3))
+    mi, ma = np.min(lon_ran), np.max(lon_ran)
+    lon_ran = np.linspace(mi, ma, np.ceil((ma - mi) + 3))
+    mi, ma = np.min(lat_ran), np.max(lat_ran)
+    lat_ran = np.linspace(mi, ma, np.ceil((ma - mi) + 3))
 
     zones = []
-    for lon in lon_ex:
-        for lat in lat_ex:
+    for lon in lon_ran:
+        for lat in lat_ran:
             dx = lon - srtm_x0
             dy = lat - srtm_y0
             assert dy < 0
