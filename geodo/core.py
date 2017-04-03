@@ -1015,26 +1015,32 @@ def _get_cru_file_unlocked(cru_dir, var=None):
     return ofile
 
 
-def get_topo_file(lon_ex, lat_ex, rgi_region=None, source=None):
+def get_topo_file(lon_ex, lat_ex, outdir, rgi_region=None, source=None):
     """
-    Returns a path to the DEM file covering the desired extent.
+    Returns a path to a Digital Elevation Model (DEM) file covering the 
+    desired extent.
 
     If the file is not present, download it. If the extent covers two or
-    more files, merge them.
+    more files, they are automatically merged.
 
-    Returns a downloaded SRTM file for [-60S;60N], and
-    a corrected DEM3 from viewfinderpanoramas.org else
+    By default, returns a downloaded SRTM file for [-60S;60N], and
+    a corrected DEM3 from viewfinderpanoramas.org else. However, the data 
+    source can be determined manually with the `source` keyword. If a list
+    of sources is given, one after the other is checked and in case a DEM 
+    exists for the sources, this DEM is returned.
 
     Parameters
     ----------
     lon_ex : tuple, required
-        a (min_lon, max_lon) tuple deliminating the requested area longitudes
+        A (min_lon, max_lon) tuple delimitating the requested area longitudes.
     lat_ex : tuple, required
-        a (min_lat, max_lat) tuple deliminating the requested area latitudes
+        A (min_lat, max_lat) tuple delimitating the requested area latitudes.
+    outdir : str, required
+        Directory where to store the DEM file.
     rgi_region : int, optional
-        the RGI region number (required for the GIMP DEM)
+        The RGI region number (required for the GIMP DEM).
     source : str or list of str, optional
-        if you want to force the use of a certain DEM source. Available are:
+        If you want to force the use of a certain DEM source. Available are:
           - 'USER' : file set in cfg.PATHS['dem_file']
           - 'SRTM' : SRTM v4.1
           - 'GIMP' : https://bpcrc.osu.edu/gdg/data/gimpdem
@@ -1045,9 +1051,10 @@ def get_topo_file(lon_ex, lat_ex, rgi_region=None, source=None):
 
     Returns
     -------
-    tuple: (path to the dem file, data source)
+    tuple: (path to the DEM file, data source).
     """
 
+    # If a list of possible sources is given, process them successively
     if source is not None and not isinstance(source, string_types):
         # check all user options
         for s in source:
@@ -1057,15 +1064,7 @@ def get_topo_file(lon_ex, lat_ex, rgi_region=None, source=None):
             if os.path.isfile(demf):
                 return demf, source_str
 
-    # Did the user specify a specific DEM file?
-    if 'dem_file' in cfg.PATHS and os.path.isfile(cfg.PATHS['dem_file']):
-        source = 'USER' if source is None else source
-        if source == 'USER':
-            return cfg.PATHS['dem_file'], source
-
-    # If not, do the job ourselves: download and merge stuffs
-    topodir = cfg.PATHS['topo_dir']
-
+    # If not, do the job ourselves: download and merge stuff:
     # GIMP is in polar stereographic, not easy to test if glacier is on the map
     # It would be possible with a salem grid but this is a bit more expensive
     # Instead, we are just asking RGI for the region
@@ -1086,9 +1085,9 @@ def get_topo_file(lon_ex, lat_ex, rgi_region=None, source=None):
             gimp_file = _download_alternate_topo_file('AntarcticDEM_wgs84.tif')
             return gimp_file, source
 
-    # Anywhere else on Earth we chack for DEM3, ASTER, or SRTM
-    if (np.min(lat_ex) < -60.) or (np.max(lat_ex) > 60.) or \
-                    source == 'DEM3' or source == 'ASTER':
+    # Anywhere else on Earth we check for DEM3, ASTER, or SRTM
+    if (np.min(lat_ex) < -60.) or (np.max(lat_ex) > 60.) \
+            or source == 'DEM3' or source == 'ASTER':
         # default is DEM3
         source = 'DEM3' if source is None else source
         if source == 'DEM3':
@@ -1096,7 +1095,7 @@ def get_topo_file(lon_ex, lat_ex, rgi_region=None, source=None):
             zones = dem3_viewpano_zone(lon_ex, lat_ex)
             sources = []
             for z in zones:
-                sources.append(download_dem3_viewpano(z))
+                sources.append(download_dem3_viewpano(z, outdir))
             source_str = source
         if source == 'ASTER':
             # use ASTER
@@ -1113,12 +1112,12 @@ def get_topo_file(lon_ex, lat_ex, rgi_region=None, source=None):
             zones = srtm_zone(lon_ex, lat_ex)
             sources = []
             for z in zones:
-                sources.append(download_srtm_file(z))
+                sources.append(download_srtm_file(z, outdir))
             source_str = source
 
     # For the very last cases a very coarse dataset ?
     if source == 'ETOPO1':
-        t_file = os.path.join(topodir, 'ETOPO1_Ice_g_geotiff.tif')
+        t_file = os.path.join(outdir, 'ETOPO1_Ice_g_geotiff.tif')
         assert os.path.exists(t_file)
         return t_file, 'ETOPO1'
 
@@ -1140,7 +1139,7 @@ def get_topo_file(lon_ex, lat_ex, rgi_region=None, source=None):
             hash_object = hashlib.md5(bname.encode())
             bname = hash_object.hexdigest() + '.tif'
 
-        merged_file = os.path.join(topodir, source_str.lower(),
+        merged_file = os.path.join(outdir, source_str.lower(),
                                    bname)
         if not os.path.exists(merged_file):
             # check case where wrong zip file is downloaded from
