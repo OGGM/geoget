@@ -763,8 +763,23 @@ def aster_zone(lon_ran, lat_ran):
     return zones, units
 
 
-def get_demo_file(repo, fname, outdir):
-    """Returns the path to the desired OGGM file."""
+def get_sample_file(repo, fname, outdir):
+    """
+    Downloads and returns path to the given sample file.
+    
+    Parameters
+    ----------
+    repo: str
+        The GitHub repository where the file is stored.
+    fname: str
+        File name whose path should be retrieved.
+    outdir: str
+        Directory where to store the file given by fname.
+
+    Returns
+    -------
+    Path to the downloaded file. If the file doesn't exist, returns None.
+    """
 
     d = download_gh_sample_files(repo, outdir)
     if fname in d:
