@@ -6,7 +6,6 @@ License: GPLv3+
 """
 from __future__ import absolute_import, division
 
-import six.moves.cPickle as pickle
 from six import string_types
 from six.moves.urllib.request import urlretrieve, urlopen
 from six.moves.urllib.error import HTTPError, URLError, ContentTooShortError
@@ -19,40 +18,24 @@ import shutil
 import zipfile
 import sys
 import math
-import logging
-from collections import OrderedDict
-from functools import partial, wraps
+from functools import partial
 import json
 import time
 import fnmatch
 import subprocess
 
 # External libs
-import geopandas as gpd
-import pandas as pd
-import salem
-from salem import lazy_property, read_shapefile
 import numpy as np
-import netCDF4
-from scipy import stats
 from joblib import Memory
-from shapely.ops import transform as shp_trafo
-from salem import wgs84
-import xarray as xr
 import rasterio
 try:
     from rasterio.tools.merge import merge as merge_tool
 except ImportError:
     # rasterio V > 1.0
     from rasterio.merge import merge as merge_tool
-import multiprocessing as mp
 import filelock
 import oggm.cfg as cfg
-from oggm.cfg import CUMSEC_IN_MONTHS, SEC_IN_YEAR, BEGINSEC_IN_MONTHS
 from oggm.utils import mkdir
-
-SAMPLE_DATA_GH_REPO = 'OGGM/oggm-sample-data'
-
 
 
 # Joblib
@@ -107,6 +90,7 @@ def progress_urlretrieve(url, ofile):
     try:
         from progressbar import DataTransferBar, UnknownLength
         pbar = DataTransferBar()
+
         def _upd(count, size, total):
             if pbar.max_value is None:
                 if total > 0:
@@ -243,7 +227,7 @@ def _download_gh_sample_files_unlocked(repo=None, outdir=None):
             master_sha = json_obj['sha']
             # if not same, delete entire dir
             if local_sha != master_sha:
-                empty_cache()
+                empty_cache(outdir)
         except (HTTPError, URLError):
             master_sha = 'error'
     else:
@@ -467,12 +451,12 @@ def _download_dem3_viewpano_unlocked(zone, outdir):
     return outpath
 
 
-def _download_aster_file(zone, unit):
-    with get_download_lock():
-        return _download_aster_file_unlocked(zone, unit)
+def _download_aster_file(outdir, zone, unit):
+    with get_download_lock(outdir):
+        return _download_aster_file_unlocked(outdir, zone, unit)
 
 
-def _download_aster_file_unlocked(zone, unit):
+def _download_aster_file_unlocked(outdir, zone, unit):
     """Checks if the aster data is in the directory and if not, download it.
 
     You need AWS cli and AWS credentials for this. Quoting Timo:
@@ -483,11 +467,10 @@ def _download_aster_file_unlocked(zone, unit):
     Region is eu-west-1 and Output Format is json.
     """
 
-    odir = os.path.join(cfg.PATHS['topo_dir'], 'aster')
-    mkdir(odir)
+    mkdir(outdir)
     fbname = 'ASTGTM2_' + zone + '.zip'
     dirbname = 'UNIT_' + unit
-    ofile = os.path.join(odir, fbname)
+    ofile = os.path.join(outdir, fbname)
 
     cmd = 'aws --region eu-west-1 s3 cp s3://astgtmv2/ASTGTM_V2/'
     cmd = cmd + dirbname + '/' + fbname + ' ' + ofile
@@ -496,22 +479,22 @@ def _download_aster_file_unlocked(zone, unit):
         if os.path.exists(ofile):
             # Ok so the tile is a valid one
             with zipfile.ZipFile(ofile) as zf:
-                zf.extractall(odir)
+                zf.extractall(outdir)
         else:
             # Ok so this *should* be an ocean tile
             return None
 
-    out = os.path.join(odir, 'ASTGTM2_' + zone + '_dem.tif')
+    out = os.path.join(outdir, 'ASTGTM2_' + zone + '_dem.tif')
     assert os.path.exists(out)
     return out
 
 
-def _download_alternate_topo_file(fname):
-    with get_download_lock():
-        return _download_alternate_topo_file_unlocked(fname)
+def _download_alternate_topo_file(outdir, fname):
+    with get_download_lock(outdir):
+        return _download_alternate_topo_file_unlocked(outdir, fname)
 
 
-def _download_alternate_topo_file_unlocked(fname):
+def _download_alternate_topo_file_unlocked(outdir, fname):
     """Checks if the special topo data is in the directory and if not,
     download it from AWS.
 
@@ -526,9 +509,8 @@ def _download_alternate_topo_file_unlocked(fname):
     fzipname = fname + '.zip'
     # Here we had a file exists check
 
-    odir = os.path.join(cfg.PATHS['topo_dir'], 'alternate')
-    mkdir(odir)
-    ofile = os.path.join(odir, fzipname)
+    mkdir(outdir)
+    ofile = os.path.join(outdir, fzipname)
 
     cmd = 'aws --region eu-west-1 s3 cp s3://astgtmv2/topo/'
     cmd = cmd + fzipname + ' ' + ofile
@@ -538,18 +520,18 @@ def _download_alternate_topo_file_unlocked(fname):
         if os.path.exists(ofile):
             # Ok so the tile is a valid one
             with zipfile.ZipFile(ofile) as zf:
-                zf.extractall(odir)
+                zf.extractall(outdir)
         else:
             # Ok so this *should* be an ocean tile
             return None
 
-    out = os.path.join(odir, fname)
+    out = os.path.join(outdir, fname)
     assert os.path.exists(out)
     return out
 
 
 def aws_file_download(aws_path, local_path, reset=False):
-    with get_download_lock():
+    with get_download_lock(local_path):
         return _aws_file_download_unlocked(aws_path, local_path, reset)
 
 
@@ -876,7 +858,7 @@ def get_glathida_file():
         return cfg.PATHS['glathida_rgi_links']
 
     # Roll our own
-    download_gh_sample_files()
+    download_gh_sample_files('OGGM/oggm', cfg.PATHS['glathida_rgi_links'])
     sdir = os.path.join(cfg.CACHE_DIR, 'oggm-sample-data-master', 'glathida')
     outf = os.path.join(sdir, 'rgi_glathida_links_2014_RGIV5.csv')
     assert os.path.exists(outf)
@@ -1058,7 +1040,7 @@ def get_topo_file(lon_ex, lat_ex, outdir, rgi_region=None, source=None):
     if source is not None and not isinstance(source, string_types):
         # check all user options
         for s in source:
-            demf, source_str = get_topo_file(lon_ex, lat_ex,
+            demf, source_str = get_topo_file(lon_ex, lat_ex, outdir,
                                              rgi_region=rgi_region,
                                              source=s)
             if os.path.isfile(demf):
@@ -1071,7 +1053,8 @@ def get_topo_file(lon_ex, lat_ex, outdir, rgi_region=None, source=None):
     if source == 'GIMP' or (rgi_region is not None and int(rgi_region) == 5):
         source = 'GIMP' if source is None else source
         if source == 'GIMP':
-            gimp_file = _download_alternate_topo_file('gimpdem_90m.tif')
+            gimp_file = _download_alternate_topo_file(outdir,
+                                                      'gimpdem_90m.tif')
             return gimp_file, source
 
     # Same for Antarctica
@@ -1082,7 +1065,8 @@ def get_topo_file(lon_ex, lat_ex, outdir, rgi_region=None, source=None):
         else:
             source = 'RAMP' if source is None else source
         if source == 'RAMP':
-            gimp_file = _download_alternate_topo_file('AntarcticDEM_wgs84.tif')
+            gimp_file = _download_alternate_topo_file(outdir,
+                                                      'AntarcticDEM_wgs84.tif')
             return gimp_file, source
 
     # Anywhere else on Earth we check for DEM3, ASTER, or SRTM
@@ -1102,7 +1086,7 @@ def get_topo_file(lon_ex, lat_ex, outdir, rgi_region=None, source=None):
             zones, units = aster_zone(lon_ex, lat_ex)
             sources = []
             for z, u in zip(zones, units):
-                sf = _download_aster_file(z, u)
+                sf = _download_aster_file(outdir, z, u)
                 if sf is not None:
                     sources.append(sf)
             source_str = source
