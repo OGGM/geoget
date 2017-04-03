@@ -884,12 +884,27 @@ def get_glathida_file():
     return outf
 
 
-def get_rgi_dir():
-    with get_download_lock():
-        return _get_rgi_dir_unlocked()
+def get_rgi_data(outdir, version='5.0'):
+    """
+    Checks if the given version of the Randolph Glacier Inventory (RGI) is in 
+    the given directory. If not, downloads it.
+    
+    Parameters
+    ----------
+    outdir: str
+        Directory where to download the RGI to, if not already present.
+    version: str
+        Version of RGI to be downloaded.
+
+    Returns
+    -------
+    Directory where the RGI is stored.
+    """
+    with get_download_lock(outdir):
+        return _get_rgi_data_unlocked(outdir, version)
 
 
-def _get_rgi_dir_unlocked():
+def _get_rgi_data_unlocked(rgi_dir, version):
     """
     Returns a path to the RGI directory.
 
@@ -900,26 +915,30 @@ def _get_rgi_dir_unlocked():
     path to the RGI directory
     """
 
-    # Be sure the user gave a sensible path to the rgi dir
-    rgi_dir = cfg.PATHS['rgi_dir']
-    if not os.path.exists(rgi_dir):
-        raise ValueError('The RGI data directory does not exist!')
+    version_fn = version.replace('.', '')  # version for filenames
 
-    bname = 'rgi50.zip'
+    if not os.path.exists(rgi_dir):
+        mkdir(rgi_dir)
+
+    bname = 'rgi{}.zip'.format(version_fn)
     ofile = os.path.join(rgi_dir, bname)
 
     # if not there download it
     if not os.path.exists(ofile):  # pragma: no cover
-        tf = 'http://www.glims.org/RGI/rgi50_files/' + bname
-        progress_urlretrieve(tf, ofile)
+        tf = 'http://www.glims.org/RGI/rgi{}_files/'.format(version_fn) + bname
+        try:
+            progress_urlretrieve(tf, ofile)
+        except HTTPError:
+            raise ValueError('Check if the given RGI version {} exists.'
+                             .format(version))
 
         # Extract root
         with zipfile.ZipFile(ofile) as zf:
             zf.extractall(rgi_dir)
 
         # Extract subdirs
-        pattern = '*_rgi50_*.zip'
-        for root, dirs, files in os.walk(cfg.PATHS['rgi_dir']):
+        pattern = '*_rgi{}_*.zip'.format(version_fn)
+        for root, dirs, files in os.walk(rgi_dir):
             for filename in fnmatch.filter(files, pattern):
                 ofile = os.path.join(root, filename)
                 with zipfile.ZipFile(ofile) as zf:
