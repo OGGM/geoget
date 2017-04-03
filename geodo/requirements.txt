@@ -10,3 +10,5 @@ joblib
 shapely
 xarray
 rasterio
+filelock
+progressbar
