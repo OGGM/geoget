@@ -62,6 +62,27 @@ MEMORY = Memory(cachedir=cfg.CACHE_DIR, verbose=0)
 # Function
 tuple2int = partial(np.array, dtype=np.int64)
 
+# Special regions for viewfinderpanoramas.org (Should be external!?)
+DEM3REG = {
+        'ISL': [-25., -12., 63., 67.],  # Iceland
+        'SVALBARD': [10., 34., 76., 81.],
+        'JANMAYEN': [-10., -7., 70., 72.],
+        'FJ': [36., 66., 79., 82.],  # Franz Josef Land
+        'FAR': [-8., -6., 61., 63.],  # Faroer
+        'BEAR': [18., 20., 74., 75.],  # Bear Island
+        'SHL': [-3., 0., 60., 61.],  # Shetland
+        # Antarctica tiles as UTM zones, large files
+        # '01-15': [-180., -91., -90, -60.],
+        # '16-30': [-91., -1., -90., -60.],
+        # '31-45': [-1., 89., -90., -60.],
+        # '46-60': [89., 189., -90., -60.],
+        # Greenland tiles
+        # 'GL-North': [-78., -11., 75., 84.],
+        # 'GL-West': [-68., -42., 64., 76.],
+        # 'GL-South': [-52., -40., 59., 64.],
+        # 'GL-East': [-42., -17., 64., 76.]
+    }
+
 
 def get_download_lock(lock_dir):
     mkdir(lock_dir)
@@ -351,25 +372,6 @@ def download_dem3_viewpano(zone, outdir):
 def _download_dem3_viewpano_unlocked(zone, outdir):
     """Checks if the srtm data is in the directory and if not, download it.
     """
-    DEM3REG = {
-        'ISL': [-25., -12., 63., 67.],  # Iceland
-        'SVALBARD': [10., 34., 76., 81.],
-        'JANMAYEN': [-10., -7., 70., 72.],
-        'FJ': [36., 66., 79., 82.],  # Franz Josef Land
-        'FAR': [-8., -6., 61., 63.],  # Faroer
-        'BEAR': [18., 20., 74., 75.],  # Bear Island
-        'SHL': [-3., 0., 60., 61.],  # Shetland
-        # Antarctica tiles as UTM zones, large files
-        # '01-15': [-180., -91., -90, -60.],
-        # '16-30': [-91., -1., -90., -60.],
-        # '31-45': [-1., 89., -90., -60.],
-        # '46-60': [89., 189., -90., -60.],
-        # Greenland tiles
-        # 'GL-North': [-78., -11., 75., 84.],
-        # 'GL-West': [-68., -42., 64., 76.],
-        # 'GL-South': [-52., -40., 59., 64.],
-        # 'GL-East': [-42., -17., 64., 76.]
-    }
 
     mkdir(outdir)
     ofile = os.path.join(outdir, 'dem3_' + zone + '.zip')
@@ -615,49 +617,65 @@ def srtm_zone(lon_ran, lat_ran):
     return list(sorted(set(zones)))
 
 
-def dem3_viewpano_zone(lon_ex, lat_ex):
-    """Returns a list of DEM3 zones covering the desired extent.
+def dem3_viewpano_zone(lon_ran, lat_ran, extra_reg=DEM3REG):
+    """
+    Returns a list of DEM3 zones on viewfinderpanoramas.org covering the 
+    desired latitude/longitude range.
 
+    For an overview of the region scheme, see:
     http://viewfinderpanoramas.org/Coverage%20map%20viewfinderpanoramas_org3.htm
+    
+    Parameters
+    ----------
+    lon_ran: array-like
+        Longitude range
+    lat_ran: array-like
+        Latitude range
+    extra_reg: dict
+        A dictionary of the extra regions not following the scheme.
+
+    Returns
+    -------
+    A list of viewfinderpanorama zones covering the latitude/longitude range.
     """
 
-    for _f in DEM3REG.keys():
+    for _f in extra_reg.keys():
 
-        if (np.min(lon_ex) >= DEM3REG[_f][0]) and \
-           (np.max(lon_ex) <= DEM3REG[_f][1]) and \
-           (np.min(lat_ex) >= DEM3REG[_f][2]) and \
-           (np.max(lat_ex) <= DEM3REG[_f][3]):
+        if (np.min(lon_ran) >= extra_reg[_f][0]) and \
+           (np.max(lon_ran) <= extra_reg[_f][1]) and \
+           (np.min(lat_ran) >= extra_reg[_f][2]) and \
+           (np.max(lat_ran) <= extra_reg[_f][3]):
 
             # test some weird inset files in Antarctica
-            if (np.min(lon_ex) >= -91.) and (np.max(lon_ex) <= -90.) and \
-               (np.min(lat_ex) >= -72.) and (np.max(lat_ex) <= -68.):
+            if (np.min(lon_ran) >= -91.) and (np.max(lon_ran) <= -90.) and \
+               (np.min(lat_ran) >= -72.) and (np.max(lat_ran) <= -68.):
                 return ['SR15']
 
-            elif (np.min(lon_ex) >= -47.) and (np.max(lon_ex) <= -43.) and \
-                 (np.min(lat_ex) >= -61.) and (np.max(lat_ex) <= -60.):
+            elif (np.min(lon_ran) >= -47.) and (np.max(lon_ran) <= -43.) and \
+                 (np.min(lat_ran) >= -61.) and (np.max(lat_ran) <= -60.):
                 return ['SP23']
 
-            elif (np.min(lon_ex) >= 162.) and (np.max(lon_ex) <= 165.) and \
-                 (np.min(lat_ex) >= -68.) and (np.max(lat_ex) <= -66.):
+            elif (np.min(lon_ran) >= 162.) and (np.max(lon_ran) <= 165.) and \
+                 (np.min(lat_ran) >= -68.) and (np.max(lat_ran) <= -66.):
                 return ['SQ58']
 
             # test some Greenland tiles as GL-North is not rectangular
-            elif (np.min(lon_ex) >= -66.) and (np.max(lon_ex) <= -60.) and \
-                 (np.min(lat_ex) >= 80.) and (np.max(lat_ex) <= 83.):
+            elif (np.min(lon_ran) >= -66.) and (np.max(lon_ran) <= -60.) and \
+                 (np.min(lat_ran) >= 80.) and (np.max(lat_ran) <= 83.):
                 return ['U20']
 
-            elif (np.min(lon_ex) >= -60.) and (np.max(lon_ex) <= -54.) and \
-                 (np.min(lat_ex) >= 80.) and (np.max(lat_ex) <= 83.):
+            elif (np.min(lon_ran) >= -60.) and (np.max(lon_ran) <= -54.) and \
+                 (np.min(lat_ran) >= 80.) and (np.max(lat_ran) <= 83.):
                 return ['U21']
 
-            elif (np.min(lon_ex) >= -54.) and (np.max(lon_ex) <= -48.) and \
-                 (np.min(lat_ex) >= 80.) and (np.max(lat_ex) <= 83.):
+            elif (np.min(lon_ran) >= -54.) and (np.max(lon_ran) <= -48.) and \
+                 (np.min(lat_ran) >= 80.) and (np.max(lat_ran) <= 83.):
                 return ['U22']
 
             else:
                 return [_f]
 
-    # if the tile doesn't have a special name, its name can be found like this:
+    # If the tile doesn't have a special name, its name can be found like this:
     # corrected SRTMs are sorted in tiles of 6 deg longitude and 4 deg latitude
     srtm_x0 = -180.
     srtm_y0 = 0.
@@ -665,11 +683,11 @@ def dem3_viewpano_zone(lon_ex, lat_ex):
     srtm_dy = 4.
 
     # quick n dirty solution to be sure that we will cover the whole range
-    mi, ma = np.min(lon_ex), np.max(lon_ex)
+    mi, ma = np.min(lon_ran), np.max(lon_ran)
     # TODO: Fabien, find out what Johannes wanted with this +3
     # +3 is just for the number to become still a bit larger
     lon_ex = np.linspace(mi, ma, np.ceil((ma - mi)/srtm_dy)+3)
-    mi, ma = np.min(lat_ex), np.max(lat_ex)
+    mi, ma = np.min(lat_ran), np.max(lat_ran)
     lat_ex = np.linspace(mi, ma, np.ceil((ma - mi)/srtm_dx)+3)
 
     zones = []
