@@ -1,11 +1,11 @@
-Geodo - License
+Geoget - License
 ===============
 
-Copyright (c) 2017 geodo developers
+Copyright (c) 2017 geoget developers
 
-Geodo is a program collection containing the main
-geodo script as well as auxiliary tools. If not stated otherwise explicitly,
-all files found in the geodo repository are licensed under the **GPLv3+** (see
+Geoget is a program collection containing the main
+geoget script as well as auxiliary tools. If not stated otherwise explicitly,
+all files found in the geoget repository are licensed under the **GPLv3+** (see
 ``COPYING``).
 
 This program is free software: you can redistribute it and/or modify
