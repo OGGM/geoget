@@ -4,7 +4,7 @@ import unittest
 import os
 import shutil
 import salem
-from geoget.tests import is_download
+from geoget.tests import is_download, is_slow
 from geoget import core
 
 # Setting for warnings
@@ -160,6 +160,7 @@ class TestDataFiles(unittest.TestCase):
         self.assertTrue(os.path.exists(of))
 
     @is_download
+    @is_slow
     def test_download_rgi(self):
 
         of = core.get_rgi_data(TEST_DIR, version='5.0')

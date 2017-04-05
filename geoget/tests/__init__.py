@@ -23,7 +23,7 @@ TESTDIR_BASE = os.path.join(CURRENT_DIR, 'tmp')
 # Some control on which tests to run (useful to avoid too long tests)
 # defaults everywhere else than travis
 ON_TRAVIS = False
-RUN_SLOW_TESTS = True
+RUN_SLOW_TESTS = False
 RUN_DOWNLOAD_TESTS = True
 
 if sys.version_info < (3, 5):
