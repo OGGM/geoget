@@ -1,6 +1,5 @@
 import six
 from distutils.version import LooseVersion
-import osgeo.gdal
 import os
 import sys
 import unittest
