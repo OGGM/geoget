@@ -9,6 +9,6 @@ netCDF4
 joblib
 shapely
 xarray
-rasterio
+rasterio>=1.0a1
 filelock
 progressbar33
