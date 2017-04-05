@@ -4,8 +4,8 @@ import unittest
 import os
 import shutil
 import salem
-from geodo.tests import is_download
-from geodo import core
+from geoget.tests import is_download
+from geoget import core
 
 # Setting for warnings
 warnings.filterwarnings("once", category=DeprecationWarning)
