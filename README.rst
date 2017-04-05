@@ -24,6 +24,11 @@ About
 :Status:
     Experimental - in development
 
+:Tests:
+    .. image:: https://travis-ci.org/OGGM/geoget.svg?branch=master
+        :target: https://travis-ci.org/OGGM/geoget
+        :alt: Linux build status
+
 :License:
 
     geoget is available under the open source `GNU GPLv3 license`_.
