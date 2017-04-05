@@ -18,15 +18,12 @@ import shutil
 import zipfile
 import sys
 import math
-from functools import partial
 import json
 import time
 import fnmatch
-import subprocess
 
 # External libs
 import numpy as np
-from joblib import Memory
 import rasterio
 try:
     from rasterio.tools.merge import merge as merge_tool
@@ -34,15 +31,6 @@ except ImportError:
     # rasterio V > 1.0
     from rasterio.merge import merge as merge_tool
 import filelock
-import oggm.cfg as cfg
-from oggm.utils import mkdir
-
-
-# Joblib
-MEMORY = Memory(cachedir=cfg.CACHE_DIR, verbose=0)
-
-# Function
-tuple2int = partial(np.array, dtype=np.int64)
 
 # Special regions for viewfinderpanoramas.org (Should be external!?)
 DEM3REG = {
@@ -64,6 +52,48 @@ DEM3REG = {
         # 'GL-South': [-52., -40., 59., 64.],
         # 'GL-East': [-42., -17., 64., 76.]
     }
+
+
+def mkdir(path, reset=False):
+    """Checks if directory exists and if not, create one.
+    
+    Parameters
+    ----------
+    path: str
+        Path to the directory to be made.
+    reset: bool
+        Erase the content of the directory if exists.
+    """
+
+    if reset and os.path.exists(path):
+        shutil.rmtree(path)
+
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+
+# Needed in order not to make shutil.rmtree fail on Windows
+# http://stackoverflow.com/questions/2656322/shutil-rmtree-fails-on-windows-\
+# with-access-is-denied
+# TODO: Doesn't help, because download.lock is 'used by another process'
+def onerror(func, path, exc_info):
+    """
+    Error handler for ``shutil.rmtree``.
+
+    If the error is due to an access error (read only file)
+    it attempts to add write permission and then retries.
+
+    If the error is for another reason it re-raises the error.
+
+    Usage : ``shutil.rmtree(path, onerror=onerror)``
+    """
+    import stat
+    if not os.access(path, os.W_OK):
+        # Is the error an access error ?
+        os.chmod(path, stat.S_IWUSR)
+        func(path)
+    else:
+        raise
 
 
 def get_download_lock(lock_dir):
@@ -120,7 +150,7 @@ def empty_cache(cdir):
     """
 
     if os.path.exists(cdir):
-        shutil.rmtree(cdir)
+        shutil.rmtree(cdir, onerror=onerror)
     os.makedirs(cdir)
 
 
@@ -163,8 +193,10 @@ def download_gh_sample_files(repo, outdir):
     A dictionary indicating all downloaded files (keys) and their local paths
     (values).
     """
-    with get_download_lock(lock_dir=outdir):
-        return _download_gh_sample_files_unlocked(repo=repo, outdir=outdir)
+    # quick fix in order not to make removing the download.lock a problem
+    # (only on Windows?)
+    # with get_download_lock(lock_dir=outdir):
+    return _download_gh_sample_files_unlocked(repo=repo, outdir=outdir)
 
 
 def _download_gh_sample_files_unlocked(repo=None, outdir=None):
@@ -444,118 +476,23 @@ def _download_dem3_viewpano_unlocked(zone, outdir):
         dst.write(dest)
 
     assert os.path.exists(outpath)
-    # delete original files to spare disk space
-    for s in globlist:
-        os.remove(s)
+    # delete original files to spare disk space (Can cause problems on Windows
+    # that's why try/except
+    try:
+        for s in globlist:
+            os.remove(s)
+    except PermissionError:
+        pass
 
     return outpath
 
 
-def _download_aster_file(outdir, zone, unit):
-    with get_download_lock(outdir):
-        return _download_aster_file_unlocked(outdir, zone, unit)
+def _download_aster_file():
+    raise NotImplementedError()
 
 
-def _download_aster_file_unlocked(outdir, zone, unit):
-    """Checks if the aster data is in the directory and if not, download it.
-
-    You need AWS cli and AWS credentials for this. Quoting Timo:
-
-    $ aws configure
-
-    Key ID und Secret you should have
-    Region is eu-west-1 and Output Format is json.
-    """
-
-    mkdir(outdir)
-    fbname = 'ASTGTM2_' + zone + '.zip'
-    dirbname = 'UNIT_' + unit
-    ofile = os.path.join(outdir, fbname)
-
-    cmd = 'aws --region eu-west-1 s3 cp s3://astgtmv2/ASTGTM_V2/'
-    cmd = cmd + dirbname + '/' + fbname + ' ' + ofile
-    if not os.path.exists(ofile):
-        subprocess.call(cmd, shell=True)
-        if os.path.exists(ofile):
-            # Ok so the tile is a valid one
-            with zipfile.ZipFile(ofile) as zf:
-                zf.extractall(outdir)
-        else:
-            # Ok so this *should* be an ocean tile
-            return None
-
-    out = os.path.join(outdir, 'ASTGTM2_' + zone + '_dem.tif')
-    assert os.path.exists(out)
-    return out
-
-
-def _download_alternate_topo_file(outdir, fname):
-    with get_download_lock(outdir):
-        return _download_alternate_topo_file_unlocked(outdir, fname)
-
-
-def _download_alternate_topo_file_unlocked(outdir, fname):
-    """Checks if the special topo data is in the directory and if not,
-    download it from AWS.
-
-    You need AWS cli and AWS credentials for this. Quoting Timo:
-
-    $ aws configure
-
-    Key ID und Secret you should have
-    Region is eu-west-1 and Output Format is json.
-    """
-
-    fzipname = fname + '.zip'
-    # Here we had a file exists check
-
-    mkdir(outdir)
-    ofile = os.path.join(outdir, fzipname)
-
-    cmd = 'aws --region eu-west-1 s3 cp s3://astgtmv2/topo/'
-    cmd = cmd + fzipname + ' ' + ofile
-    if not os.path.exists(ofile):
-        print('Downloading ' + fzipname + ' from AWS s3...')
-        subprocess.call(cmd, shell=True)
-        if os.path.exists(ofile):
-            # Ok so the tile is a valid one
-            with zipfile.ZipFile(ofile) as zf:
-                zf.extractall(outdir)
-        else:
-            # Ok so this *should* be an ocean tile
-            return None
-
-    out = os.path.join(outdir, fname)
-    assert os.path.exists(out)
-    return out
-
-
-def aws_file_download(aws_path, local_path, reset=False):
-    with get_download_lock(local_path):
-        return _aws_file_download_unlocked(aws_path, local_path, reset)
-
-
-def _aws_file_download_unlocked(aws_path, local_path, reset=False):
-    """Download a file from the AWS drive s3://astgtmv2/
-
-    **Note:** you need AWS credentials for this to work.
-
-    Parameters
-    ----------
-    aws_path: path relative to  s3://astgtmv2/
-    local_path: where to copy the file
-    reset: overwrite the local file
-    """
-
-    if reset and os.path.exists(local_path):
-        os.remove(local_path)
-
-    cmd = 'aws --region eu-west-1 s3 cp s3://astgtmv2/'
-    cmd = cmd + aws_path + ' ' + local_path
-    if not os.path.exists(local_path):
-        subprocess.call(cmd, shell=True)
-    if not os.path.exists(local_path):
-        raise RuntimeError('Something went wrong with the download')
+def _download_alternate_topo_file():
+    raise NotImplementedError()
 
 
 def srtm_zone(lon_ran, lat_ran):
@@ -582,9 +519,9 @@ def srtm_zone(lon_ran, lat_ran):
 
     # quick n dirty solution to be sure that we will cover the whole range
     mi, ma = np.min(lon_ran), np.max(lon_ran)
-    lon_ran = np.linspace(mi, ma, np.ceil((ma - mi) + 3))
+    lon_ran = np.linspace(mi, ma, int(np.ceil((ma - mi) + 3)))
     mi, ma = np.min(lat_ran), np.max(lat_ran)
-    lat_ran = np.linspace(mi, ma, np.ceil((ma - mi) + 3))
+    lat_ran = np.linspace(mi, ma, int(np.ceil((ma - mi) + 3)))
 
     zones = []
     for lon in lon_ran:
@@ -667,9 +604,9 @@ def dem3_viewpano_zone(lon_ran, lat_ran, extra_reg=DEM3REG):
     mi, ma = np.min(lon_ran), np.max(lon_ran)
     # TODO: Fabien, find out what Johannes wanted with this +3
     # +3 is just for the number to become still a bit larger
-    lon_ex = np.linspace(mi, ma, np.ceil((ma - mi)/srtm_dy)+3)
+    lon_ex = np.linspace(mi, ma, int(np.ceil((ma - mi)/srtm_dy)+3))
     mi, ma = np.min(lat_ran), np.max(lat_ran)
-    lat_ex = np.linspace(mi, ma, np.ceil((ma - mi)/srtm_dx)+3)
+    lat_ex = np.linspace(mi, ma, int(np.ceil((ma - mi)/srtm_dx)+3))
 
     zones = []
     for lon in lon_ex:
@@ -709,9 +646,9 @@ def aster_zone(lon_ran, lat_ran):
 
     # quick n dirty solution to be sure that we will cover the whole range
     mi, ma = np.min(lon_ran), np.max(lon_ran)
-    lon_ran = np.linspace(mi, ma, np.ceil((ma - mi) + 3))
+    lon_ran = np.linspace(mi, ma, int(np.ceil((ma - mi) + 3)))
     mi, ma = np.min(lat_ran), np.max(lat_ran)
-    lat_ran = np.linspace(mi, ma, np.ceil((ma - mi) + 3))
+    lat_ran = np.linspace(mi, ma, int(np.ceil((ma - mi) + 3)))
 
     zones = []
     units = []
@@ -767,102 +704,6 @@ def get_sample_file(repo, fname, outdir):
         return d[fname]
     else:
         return None
-
-
-def get_cru_cl_file():
-    """Returns the path to the unpacked CRU CL file (is in sample data)."""
-
-    download_gh_sample_files('OGGM/oggm-sample-data', cfg.CACHE_DIR)
-
-    sdir = os.path.join(cfg.CACHE_DIR, 'oggm-sample-data-master', 'cru')
-    fpath = os.path.join(sdir, 'cru_cl2.nc')
-    if os.path.exists(fpath):
-        return fpath
-    else:
-        with zipfile.ZipFile(fpath + '.zip') as zf:
-            zf.extractall(sdir)
-        assert os.path.exists(fpath)
-        return fpath
-
-
-def get_wgms_files():
-    """Get the path to the default WGMS-RGI link file and the data dir.
-
-    Returns
-    -------
-    (file, dir): paths to the files
-    """
-
-    if cfg.PATHS['wgms_rgi_links'] != '~':
-        if not os.path.exists(cfg.PATHS['wgms_rgi_links']):
-            raise ValueError('wrong wgms_rgi_links path provided.')
-        # User provided data
-        outf = cfg.PATHS['wgms_rgi_links']
-        datadir = os.path.join(os.path.dirname(outf), 'mbdata')
-        if not os.path.exists(datadir):
-            raise ValueError('The WGMS data directory is missing')
-        return outf, datadir
-
-    # Roll our own
-    download_gh_sample_files('OGGM/oggm-sample-data', cfg.CACHE_DIR)
-    sdir = os.path.join(cfg.CACHE_DIR, 'oggm-sample-data-master', 'wgms')
-    outf = os.path.join(sdir, 'rgi_wgms_links_2015_RGIV5.csv')
-    assert os.path.exists(outf)
-    datadir = os.path.join(sdir, 'mbdata')
-    assert os.path.exists(datadir)
-    return outf, datadir
-
-
-def get_leclercq_files():
-    """Get the path to the default Leclercq-RGI link file and the data dir.
-
-    Returns
-    -------
-    (file, dir): paths to the files
-    """
-
-    if cfg.PATHS['leclercq_rgi_links'] != '~':
-        if not os.path.exists(cfg.PATHS['leclercq_rgi_links']):
-            raise ValueError('wrong leclercq_rgi_links path provided.')
-        # User provided data
-        outf = cfg.PATHS['leclercq_rgi_links']
-        # TODO: This doesnt exist yet
-        datadir = os.path.join(os.path.dirname(outf), 'lendata')
-        # if not os.path.exists(datadir):
-        #     raise ValueError('The Leclercq data directory is missing')
-        return outf, datadir
-
-    # Roll our own
-    download_gh_sample_files('OGGM/oggm-sample-data', cfg.CACHE_DIR)
-    sdir = os.path.join(cfg.CACHE_DIR, 'oggm-sample-data-master', 'leclercq')
-    outf = os.path.join(sdir, 'rgi_leclercq_links_2012_RGIV5.csv')
-    assert os.path.exists(outf)
-    # TODO: This doesnt exist yet
-    datadir = os.path.join(sdir, 'lendata')
-    # assert os.path.exists(datadir)
-    return outf, datadir
-
-
-def get_glathida_file():
-    """Get the path to the default WGMS-RGI link file and the data dir.
-
-    Returns
-    -------
-    (file, dir): paths to the files
-    """
-
-    if cfg.PATHS['glathida_rgi_links'] != '~':
-        if not os.path.exists(cfg.PATHS['glathida_rgi_links']):
-            raise ValueError('wrong glathida_rgi_links path provided.')
-        # User provided data
-        return cfg.PATHS['glathida_rgi_links']
-
-    # Roll our own
-    download_gh_sample_files('OGGM/oggm', cfg.PATHS['glathida_rgi_links'])
-    sdir = os.path.join(cfg.CACHE_DIR, 'oggm-sample-data-master', 'glathida')
-    outf = os.path.join(sdir, 'rgi_glathida_links_2014_RGIV5.csv')
-    assert os.path.exists(outf)
-    return outf
 
 
 def get_rgi_data(outdir, version='5.0'):
@@ -949,7 +790,7 @@ def get_cru_file(outdir, var=None):
     Path to the CRU TS file
     """
     with get_download_lock(outdir):
-        return _get_cru_file_unlocked(var)
+        return _get_cru_file_unlocked(outdir, var)
 
 
 def _get_cru_file_unlocked(cru_dir, var=None):
@@ -984,9 +825,9 @@ def _get_cru_file_unlocked(cru_dir, var=None):
 
     # if not there download it
     if not os.path.exists(ofile):  # pragma: no cover
-        cru_server = 'https://crudata.uea.ac.uk/cru/data/hrg/cru_ts_3.24/' \
-                     'cruts.1609301803.v3.24/'
-        tf = cru_server + '{}/cru_ts3.23.1901.2014.{}.dat.nc.gz'.format(var,
+        cru_server = 'https://crudata.uea.ac.uk/cru/data/hrg/cru_ts_3.24.01/' \
+                     'cruts.1701201703.v3.24.01/'
+        tf = cru_server + '{}/cru_ts3.24.01.1901.2015.{}.dat.gz'.format(var,
                                                                         var)
         progress_urlretrieve(tf, ofile + '.gz')
         with gzip.GzipFile(ofile + '.gz') as zf:
@@ -1053,6 +894,7 @@ def get_topo_file(lon_ex, lat_ex, outdir, rgi_region=None, source=None):
     if source == 'GIMP' or (rgi_region is not None and int(rgi_region) == 5):
         source = 'GIMP' if source is None else source
         if source == 'GIMP':
+            raise NotImplementedError('GIMP DEM download under development.')
             gimp_file = _download_alternate_topo_file(outdir,
                                                       'gimpdem_90m.tif')
             return gimp_file, source
@@ -1065,6 +907,7 @@ def get_topo_file(lon_ex, lat_ex, outdir, rgi_region=None, source=None):
         else:
             source = 'RAMP' if source is None else source
         if source == 'RAMP':
+            raise NotImplementedError('RAMP DEM download under development.')
             gimp_file = _download_alternate_topo_file(outdir,
                                                       'AntarcticDEM_wgs84.tif')
             return gimp_file, source
@@ -1082,6 +925,7 @@ def get_topo_file(lon_ex, lat_ex, outdir, rgi_region=None, source=None):
                 sources.append(download_dem3_viewpano(z, outdir))
             source_str = source
         if source == 'ASTER':
+            raise NotImplementedError('ASTER DEM download under development.')
             # use ASTER
             zones, units = aster_zone(lon_ex, lat_ex)
             sources = []
