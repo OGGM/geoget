@@ -21,12 +21,6 @@ TESTDIR_BASE = os.path.join(CURRENT_DIR, 'tmp')
 
 # Some logic to see which environment we are running on
 
-# GDAL version changes the way interpolation is made (sigh...)
-HAS_NEW_GDAL = False
-if osgeo.gdal.__version__ >= '1.11':
-    HAS_NEW_GDAL = True
-
-
 # Some control on which tests to run (useful to avoid too long tests)
 # defaults everywhere else than travis
 ON_TRAVIS = False

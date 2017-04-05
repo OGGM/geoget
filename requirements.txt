@@ -14,4 +14,3 @@ filelock
 progressbar33
 pytest-cov
 setuptools
-gdal
