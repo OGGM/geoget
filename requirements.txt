@@ -13,9 +13,7 @@ rasterio>=1.0a1
 filelock
 progressbar33
 pytest-cov
-os
 setuptools
-sys
 importlib
 gdal
 logging
