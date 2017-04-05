@@ -13,3 +13,14 @@ rasterio>=1.0a1
 filelock
 progressbar33
 pytest-cov
+warnings
+unittest
+os
+shutil
+setuptools
+codecs
+re
+sys
+importlib
+osgeo
+logging
