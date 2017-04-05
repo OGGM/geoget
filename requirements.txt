@@ -12,3 +12,4 @@ xarray
 rasterio>=1.0a1
 filelock
 progressbar33
+pytest-cov
