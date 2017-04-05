@@ -1,4 +1,4 @@
-"""Setup file for the geodo package.
+"""Setup file for the geoget package.
 
    Adapted from the Python Packaging Authority template and also from xarray's.
 """
@@ -18,11 +18,11 @@ ISRELEASED = False
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 QUALIFIER = ''
 
-DISTNAME = 'geodo'
+DISTNAME = 'geoget'
 LICENSE = 'GPLv3+'
-AUTHOR = 'geodo Developers'
-AUTHOR_EMAIL = 'https://github.com/OGGM/geodo'
-URL = 'https://github.com/OGGM/geodo'
+AUTHOR = 'geoget Developers'
+AUTHOR_EMAIL = 'https://github.com/OGGM/geoget'
+URL = 'https://github.com/OGGM/geoget'
 CLASSIFIERS = [
         # How mature is this project? Common values are
         # 3 - Alpha  4 - Beta  5 - Production/Stable
@@ -62,9 +62,9 @@ if not ISRELEASED:
 
     if pipe is None or pipe.returncode != 0:
         # no git, or not in git dir
-        if path.exists('geodo/version.py'):
+        if path.exists('geoget/version.py'):
             warnings.warn("WARNING: Couldn't get git revision, using existing "
-                          "geodo/version.py")
+                          "geoget/version.py")
             write_version = False
         else:
             warnings.warn("WARNING: Couldn't get git revision, using generic "
@@ -94,7 +94,7 @@ version = '%s'
 short_version = '%s'
 """
     if not filename:
-        filename = path.join(path.dirname(__file__), 'geodo', 'version.py')
+        filename = path.join(path.dirname(__file__), 'geoget', 'version.py')
 
     a = open(filename, 'w')
     try:
