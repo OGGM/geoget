@@ -17,7 +17,7 @@ examples/*checkpoints
 eggs
 
 # specific
-geodo/tests/tmp_*
+geoget/tests/tmp_*
 *.lock
 *.html
 docs/*-gen.rst
@@ -27,4 +27,4 @@ docs/generated
 docs/_sources
 docs/_images
 docs/.doctrees
-geodo/version.py
+geoget/version.py
