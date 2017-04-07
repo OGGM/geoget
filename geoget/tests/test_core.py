@@ -4,7 +4,7 @@ import unittest
 import os
 import shutil
 import salem
-from geoget.tests import is_download, is_slow
+from geoget.tests import is_download, is_slow, requires_credentials, cred
 from geoget import core
 
 # Setting for warnings
@@ -177,3 +177,14 @@ class TestDataFiles(unittest.TestCase):
         zone = 'U44'
         fp = core.download_dem3_viewpano(zone, TEST_DIR)
         self.assertTrue(os.path.exists(fp))
+
+    @requires_credentials
+    def test_get_postgresql_data(self):
+
+        # take GLAMOS as test
+        connect = cred['glamos']
+        statement = "SELECT * FROM mass_balance.web_mass_balance_annual " \
+                    "WHERE glacier_short_name = 'silvretta' AND xval = 1973;"
+        df = core.get_postgresql_data(connect, statement)
+        assert df.name.iloc[0] == 'Silvrettagletscher'
+

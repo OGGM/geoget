@@ -8,6 +8,7 @@ import matplotlib
 import numpy as np
 from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import URLError
+from configobj import ConfigObj, ConfigObjError
 
 
 # Defaults
@@ -37,6 +38,18 @@ try:
 except URLError:
     HAS_INTERNET = False
 
+# check if there is a credentials file (should be added to .gitignore)
+cred_path = os.path.abspath(os.path.join(__file__, "../../..", '.credentials'))
+if os.path.exists(cred_path):
+    HAS_CREDENTIALS = True
+    try:
+        cred = ConfigObj(cred_path)
+    except ConfigObjError:
+        raise
+else:
+    HAS_CREDENTIALS = False
+    cred = None
+
 
 def requires_internet(test):
     # Test decorator
@@ -48,6 +61,12 @@ def requires_py3(test):
     # Test decorator
     msg = "requires python3"
     return unittest.skip(msg)(test) if six.PY2 else test
+
+
+def requires_credentials(test):
+    # Test decorator
+    msg = 'requires credentials'
+    return test if HAS_CREDENTIALS else unittest.skip(msg)(test)
 
 
 def is_slow(test):

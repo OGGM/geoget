@@ -14,3 +14,5 @@ filelock
 progressbar33
 pytest-cov
 setuptools
+psycopg2
+configobj
