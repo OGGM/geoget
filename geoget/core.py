@@ -25,6 +25,8 @@ import fnmatch
 # External libs
 import numpy as np
 import rasterio
+import psycopg2
+import pandas as pd
 try:
     from rasterio.tools.merge import merge as merge_tool
 except ImportError:
@@ -986,3 +988,45 @@ def get_topo_file(lon_ex, lat_ex, outdir, rgi_region=None, source=None):
             with rasterio.open(merged_file, 'w', **profile) as dst:
                 dst.write(dest)
         return merged_file, source_str + '_MERGED'
+
+
+def get_postgresql_data(connectargs, statement):
+    """
+    Retrieves data from a PostgreSQL database as `pandas.DataFrame`.
+    
+    Parameters
+    ----------
+    connectargs: dict, tuple, str
+        The connection details. Keys must be accepted by a 
+        `libq connection string`_.
+    statement: str
+        A query statement.
+
+    Returns
+    -------
+    
+    .. _libq connection string:
+        https://www.postgresql.org/docs/current/static/libpq-connect.html#LIBPQ-PARAMKEYWORDS
+    """
+
+    if isinstance(connectargs, str):
+        conn_str = connectargs
+    elif isinstance(connectargs, dict):
+        conn_str = ' '.join(['%s=\'%s\'' % (key, value) for (key, value) in
+                             connectargs.items()])
+    elif isinstance(connectargs, tuple):
+        conn_str = ' '.join(['%s=\'%s\'' % (a, b) for (a, b) in
+                             connectargs])
+    else:
+        raise TypeError('Connection details must be str, dict or tuple.')
+
+    conn = psycopg2.connect(conn_str)
+    cursor = conn.cursor()
+    cursor.execute(statement)
+
+    cols = []
+    [cols.append(l[0]) for l in cursor.description]
+    df = pd.DataFrame(cursor.fetchall(), columns=cols)
+    conn.close()
+    cursor.close()
+    return df
